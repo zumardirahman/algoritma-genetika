@@ -93,7 +93,7 @@ class GeneticAlgorithm {
 	
 private function generateTimeSlots($sksDuration = 50, $interval = 10, $breaks = []) {
     $breaks = 	[
-					['startHour' => 12, 'startMinute' => 40, 'endHour' => 13, 'endMinute' => 0], // Istirahat siang
+					['startHour' => 12, 'startMinute' => 40, 'endHour' => 13, 'endMinute' => 30], // Istirahat siang
 					['startHour' => 11, 'startMinute' => 30, 'endHour' => 13, 'endMinute' => 30]  // Istirahat Jumat
 				];
 
