@@ -36,7 +36,7 @@
 
     // Mendapatkan hasil terbaik dari algoritma genetika
     $bestSchedule = $ga->getBestSchedule();
-var_dump($bestSchedule);
+//var_dump($bestSchedule);
     // Mengekstrak data mata kuliah, dosen, dan ruangan dari database
     $coursesArray = fetchAllCourses($pdo);
     $teachersArray = fetchAllTeachers($pdo);
@@ -53,8 +53,8 @@ if (isset($bestSchedule->error)) {
         echo "<tr>";
         echo "<th>Kode Mata Kuliah</th>";
         echo "<th>Nama Mata Kuliah</th>";
-        echo "<th>Ruangan</th>";
         echo "<th>SKS</th>";
+        echo "<th>Ruangan</th>";
         echo "<th>Hari</th>";
         echo "<th>Waktu</th>";
         echo "<th>Dosen Pengajar</th>";
@@ -81,8 +81,8 @@ if (isset($bestSchedule->error)) {
             echo "<tr>";
             echo "<td>{$course['code']}</td>";
             echo "<td>{$course['name']}</td>";
-            echo "<td>{$room['name']} (Capacity: {$room['capacity']} )</td>";
             echo "<td>{$course['sks']}</td>";
+            echo "<td>{$room['name']} (Capacity: {$room['capacity']} )</td>";
             echo "<td>{$day}</td>";
             echo "<td>{$startTime} - {$endTime}</td>";
             echo "<td>{$teacher['name']}</td>";

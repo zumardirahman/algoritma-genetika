@@ -91,12 +91,32 @@ class GeneticAlgorithm {
 	}
 	
 	
+	
+	
+	
+	
+private function generateTimeSlots() {
+    $startHour = 8; // Waktu mulai pukul 08:00
+    $endHour = 15; // Waktu berakhir pukul 15:00
+    $timeSlots = [];
+
+    for ($hour = $startHour; $hour <= $endHour; $hour++) {
+        if ($hour == 12) {
+            continue; // Jika jam 12 siang, lewati (misalnya untuk waktu istirahat)
+        }
+        $time = str_pad($hour, 2, '0', STR_PAD_LEFT) . ":00";
+        $timeSlots[] = $time;
+    }
+
+    return $timeSlots;
+}
+	
 private function generateRandomChromosome() {
     $chromosome = [];
     $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     $courses = $this->pdo->query("SELECT * FROM tabel_courses")->fetchAll();
     $rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
-    $timeSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"];
+    $timeSlots = $this->generateTimeSlots();
     $maxAttempts = 10; // Menentukan jumlah maksimal percobaan sebelum menyerah
 
     foreach ($courses as $course) {
@@ -131,7 +151,9 @@ private function generateRandomChromosome() {
             }
 
             if ($attempt == $maxAttempts) {
-                return ["error" => "Jadwal tidak dapat dibuat"]; // Mengembalikan pesan kesalahan jika mencapai batas maksimal percobaan
+					$zonk = "<small style='color:red'><i>Kosong</i></small>";
+                   $gene_err = "{$course['code']}-{$room['name']}-{$zonk}-{$zonk}-{$zonk}-{$course['teacher_id']}";
+                $chromosome[] = $gene_err;
             }
         }
     }
@@ -145,7 +167,7 @@ private function selectRoom($course, $rooms, $chromosome, $day) {
     });
     shuffle($suitableRooms);
 
-    $timeSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"];
+    $timeSlots = $this->generateTimeSlots();
 
     foreach ($suitableRooms as $room) {
         foreach ($timeSlots as $time) {
