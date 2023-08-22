@@ -27,6 +27,18 @@ function fetchAllRooms($pdo) {
     return $rooms;
 }
 
+// Fungsi untuk mengurutkan berdasarkan hari
+function sortByDay($a, $b) {
+    $daysOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    
+    $partsA = explode("-", $a);
+    $partsB = explode("-", $b);
+    
+    $dayA = $partsA[2];
+    $dayB = $partsB[2];
+    
+    return array_search($dayA, $daysOrder) - array_search($dayB, $daysOrder);
+}
 ?>
 
 

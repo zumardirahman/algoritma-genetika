@@ -37,6 +37,8 @@ $coursesArray = fetchAllCourses($pdo);
 $teachersArray = fetchAllTeachers($pdo);
 $roomsArray = fetchAllRooms($pdo);
 
+usort($bestSchedule->chromosome, "sortByDay");
+
 foreach ($bestSchedule->chromosome as $class) {
     $parts = explode("-", $class);
 
