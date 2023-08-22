@@ -91,45 +91,72 @@ class GeneticAlgorithm {
 	}
 	
 	
-	
-	
-	
-	
-private function generateTimeSlots() {
-    $startHour = 8; // Waktu mulai pukul 08:00
-    $endHour = 15; // Waktu berakhir pukul 15:00
-    $timeSlots = [];
+private function generateTimeSlots($sksDuration = 50, $interval = 10, $breaks = []) {
+    $breaks = 	[
+					['startHour' => 12, 'startMinute' => 40, 'endHour' => 13, 'endMinute' => 0], // Istirahat siang
+					['startHour' => 11, 'startMinute' => 30, 'endHour' => 13, 'endMinute' => 30]  // Istirahat Jumat
+				];
 
-    for ($hour = $startHour; $hour <= $endHour; $hour++) {
-        if ($hour == 12) {
-            continue; // Jika jam 12 siang, lewati (misalnya untuk waktu istirahat)
+	$startHour = 7;
+    $startMinute = 30;
+    $endHour = 15;
+    $endMinute = 0;
+
+    $totalMinutes = $sksDuration + $interval;
+    $timeSlots = [];
+    $currentHour = $startHour;
+    $currentMinute = $startMinute;
+
+    while ($currentHour < $endHour || ($currentHour == $endHour && $currentMinute < $endMinute)) {
+        $currentTimeInMinutes = $currentHour * 60 + $currentMinute;
+
+        foreach ($breaks as $break) {
+            $breakStart = $break['startHour'] * 60 + $break['startMinute'];
+            $breakEnd = $break['endHour'] * 60 + $break['endMinute'];
+
+            if ($currentTimeInMinutes + $sksDuration > $breakStart && $currentTimeInMinutes < $breakEnd) {
+                $currentHour = floor($breakEnd / 60);
+                $currentMinute = $breakEnd % 60;
+                continue 2; // Lanjut ke waktu berikutnya setelah istirahat
+            }
         }
-        $time = str_pad($hour, 2, '0', STR_PAD_LEFT) . ":00";
+
+        $time = str_pad($currentHour, 2, '0', STR_PAD_LEFT) . ":" . str_pad($currentMinute, 2, '0', STR_PAD_LEFT);
         $timeSlots[] = $time;
+
+        $currentMinute += $totalMinutes;
+        while ($currentMinute >= 60) {
+            $currentHour++;
+            $currentMinute -= 60;
+        }
     }
 
     return $timeSlots;
 }
+
+
 	
 private function generateRandomChromosome() {
     $chromosome = [];
     $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     $courses = $this->pdo->query("SELECT * FROM tabel_courses")->fetchAll();
     $rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
-    $timeSlots = $this->generateTimeSlots();
+	
     $maxAttempts = 10; // Menentukan jumlah maksimal percobaan sebelum menyerah
 
     foreach ($courses as $course) {
         $meetingCounts = $course['meetings_per_week'];
         $allocatedDays = []; // Menyimpan hari-hari di mana mata kuliah sudah dijadwalkan
-
         for ($i = 0; $i < $meetingCounts; $i++) {
             $success = false;
             $attempt = 0;
 
             while (!$success && $attempt < $maxAttempts) {
                 $day = $days[array_rand($days)];
-
+				
+		$durationMinutes = $course['sks'] * 50;
+        $timeSlots = $this->generateTimeSlots($durationMinutes);
+		
                 // Pastikan mata kuliah tidak dijadwalkan pada hari yang sama dalam seminggu
                 while (in_array($day, $allocatedDays)) {
                     $day = $days[array_rand($days)];
@@ -167,7 +194,8 @@ private function selectRoom($course, $rooms, $chromosome, $day) {
     });
     shuffle($suitableRooms);
 
-    $timeSlots = $this->generateTimeSlots();
+    $durationMinutes = $course['sks'] * 50;
+    $timeSlots = $this->generateTimeSlots($durationMinutes);
 
     foreach ($suitableRooms as $room) {
         foreach ($timeSlots as $time) {
