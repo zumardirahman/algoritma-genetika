@@ -27,29 +27,6 @@ class GeneticAlgorithm {
         }
     }
 
-	private function generateRandomChromosome() {
-		$chromosome = [];
-		$days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-		$courses = $this->pdo->query("SELECT * FROM tabel_courses")->fetchAll();
-		$rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
-		$timeSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"];
-
-		foreach ($courses as $course) {
-			$meetingCounts = $course['meetings_per_week'];  // Menggunakan data dari database
-			for ($i = 0; $i < $meetingCounts; $i++) {
-				$day = $days[array_rand($days)];
-				$room = $this->selectRoom($course, $rooms, $chromosome);
-				$startTime = $this->selectTimeSlot($course, $room, $timeSlots, $chromosome);
-				$duration = $course['sks'];
-				$endTime = date("H:i", strtotime("+$duration hour", strtotime($startTime)));
-				$gene = "{$course['code']}-{$room['name']}-{$day}-{$startTime}-{$endTime}-{$course['teacher_id']}";
-				$chromosome[] = $gene;
-			}
-		}
-
-		return $chromosome;
-	}
-
     public function calculateFitness($schedule) {
         $fitness = 0;
 
@@ -114,85 +91,122 @@ class GeneticAlgorithm {
 	}
 	
 	
-	//tambahan helper
-	
-	// private function selectRoom($course, $rooms, $chromosome) {
-		// $suitableRooms = array_filter($rooms, function($room) use ($course) {
-			// return $room['capacity'] >= $course['total_students'];
-		// });
-		// shuffle($suitableRooms);
+private function generateRandomChromosome() {
+    $chromosome = [];
+    $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    $courses = $this->pdo->query("SELECT * FROM tabel_courses")->fetchAll();
+    $rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
+    $timeSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"];
+    $maxAttempts = 10; // Menentukan jumlah maksimal percobaan sebelum menyerah
 
-		// foreach ($suitableRooms as $room) {
-			// if (!$this->isRoomConflict($room, $course, $chromosome)) {
-				// return $room;
-			// }
-		// }
+    foreach ($courses as $course) {
+        $meetingCounts = $course['meetings_per_week'];
+        $allocatedDays = []; // Menyimpan hari-hari di mana mata kuliah sudah dijadwalkan
 
-		// // Fallback jika tidak ada ruangan yang sesuai (ini harus dihandle lebih lanjut)
-		// return $rooms[0];
-	// }
+        for ($i = 0; $i < $meetingCounts; $i++) {
+            $success = false;
+            $attempt = 0;
 
-	private function selectRoom($course, $rooms, $chromosome) {
-		$suitableRooms = array_filter($rooms, function($room) use ($course) {
-			return $room['capacity'] >= $course['total_students'];
-		});
-		shuffle($suitableRooms);
+            while (!$success && $attempt < $maxAttempts) {
+                $day = $days[array_rand($days)];
 
-		foreach ($suitableRooms as $room) {
-			if (!$this->isRoomConflict($room, $course, $chromosome)) {
-				return $room;
-			}
-		}
+                // Pastikan mata kuliah tidak dijadwalkan pada hari yang sama dalam seminggu
+                while (in_array($day, $allocatedDays)) {
+                    $day = $days[array_rand($days)];
+                }
 
-		// Jika sampai ke sini, berarti tidak ada ruangan yang sesuai
-		// Sebagai contoh, kita bisa memilih ruangan pertama yang tersedia sebagai fallback
-		// Tetapi dalam skenario nyata, Anda mungkin ingin menampilkan pesan kesalahan atau mencoba strategi lain
-		return $rooms[0];
-	}
+                $room = $this->selectRoom($course, $rooms, $chromosome, $day);
+                $startTime = $this->selectTimeSlot($course, $room, $timeSlots, $chromosome, $day);
+                $duration = $course['sks'];
+                $endTime = date("H:i", strtotime("+$duration hour", strtotime($startTime)));
+                
+                if (!$this->isRoomConflict($room, $course, $chromosome, $startTime, $endTime, $day)) {
+                    $gene = "{$course['code']}-{$room['name']}-{$day}-{$startTime}-{$endTime}-{$course['teacher_id']}";
+                    $chromosome[] = $gene;
+                    $allocatedDays[] = $day;
+                    $success = true;
+                }
 
-	private function isRoomConflict($room, $course, $chromosome) {
-		foreach ($chromosome as $gene) {
-			$parts = explode("-", $gene);
-			$existingRoom = $parts[1];
-			$existingStartTime = $parts[2];
-			$existingEndTime = $parts[3];
+                $attempt++;
+            }
 
-			// Kita hanya perlu memeriksa apakah ruangan sudah dipesan pada waktu yang sama
-			if ($existingRoom == $room['name'] && $existingStartTime == $parts[2] && $existingEndTime == $parts[3]) {
-				return true;
-			}
-		}
-		return false;
-	}
+            if ($attempt == $maxAttempts) {
+                return ["error" => "Jadwal tidak dapat dibuat"]; // Mengembalikan pesan kesalahan jika mencapai batas maksimal percobaan
+            }
+        }
+    }
 
-	private function selectTimeSlot($course, $room, $timeSlots, $chromosome) {
-		shuffle($timeSlots);
+    return $chromosome;
+}
 
-		foreach ($timeSlots as $time) {
-			if (!$this->isTimeConflict($time, $course, $room, $chromosome)) {
-				return $time;
-			}
-		}
+private function selectRoom($course, $rooms, $chromosome, $day) {
+    $suitableRooms = array_filter($rooms, function($room) use ($course) {
+        return $room['capacity'] >= $course['total_students'];
+    });
+    shuffle($suitableRooms);
 
-		// Fallback jika tidak ada waktu yang sesuai (ini harus dihandle lebih lanjut)
-		return $timeSlots[0];
-	}	
+    $timeSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"];
 
-	private function isTimeConflict($time, $course, $room, $chromosome) {
-		$proposedEndTime = date("H:i", strtotime("+$course[sks] hour", strtotime($time)));
+    foreach ($suitableRooms as $room) {
+        foreach ($timeSlots as $time) {
+            $proposedStartTime = $time;
+            $proposedEndTime = date("H:i", strtotime("+$course[sks] hour", strtotime($time)));
+            
+            if (!$this->isRoomConflict($room, $course, $chromosome, $proposedStartTime, $proposedEndTime, $day)) {
+                return $room;
+            }
+        }
+    }
+    return $rooms[0]; // fallback jika tidak ditemukan ruangan tanpa konflik
+}
 
-		foreach ($chromosome as $gene) {
-			$parts = explode("-", $gene);
-			$existingRoom = $parts[1];
-			$existingStartTime = $parts[2];
-			$existingEndTime = $parts[3];
+private function isRoomConflict($room, $course, $chromosome, $proposedStartTime, $proposedEndTime, $day) {
+    foreach ($chromosome as $gene) {
+        $parts = explode("-", $gene);
+        $existingRoom = $parts[1];
+        $existingDay = $parts[2];
+        $existingStartTime = $parts[3];
+        $existingEndTime = $parts[4];
 
-			if ($existingRoom == $room['name'] && $time >= $existingStartTime && $proposedEndTime <= $existingEndTime) {
-				return true;
-			}
-		}
-		return false;
-	}
+        if ($existingRoom == $room['name'] && $existingDay == $day &&
+            (($existingStartTime >= $proposedStartTime && $existingStartTime < $proposedEndTime) ||
+            ($existingEndTime > $proposedStartTime && $existingEndTime <= $proposedEndTime) ||
+            ($proposedStartTime >= $existingStartTime && $proposedStartTime < $existingEndTime) ||
+            ($proposedEndTime > $existingStartTime && $proposedEndTime <= $existingEndTime))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+private function selectTimeSlot($course, $room, $timeSlots, $chromosome, $day) {
+    shuffle($timeSlots);
+
+    foreach ($timeSlots as $time) {
+        $proposedEndTime = date("H:i", strtotime("+$course[sks] hour", strtotime($time)));
+
+        if (!$this->isTimeConflict($time, $course, $room, $chromosome, $day, $proposedEndTime)) {
+            return $time;
+        }
+    }
+    return $timeSlots[0]; // fallback
+}
+
+private function isTimeConflict($time, $course, $room, $chromosome, $day, $proposedEndTime) {
+    foreach ($chromosome as $gene) {
+        $parts = explode("-", $gene);
+        $existingRoom = $parts[1];
+        $existingDay = $parts[2];
+        $existingStartTime = $parts[3];
+        $existingEndTime = $parts[4];
+
+        if ($existingRoom == $room['name'] && $existingDay == $day && 
+            ($time >= $existingStartTime && $proposedEndTime <= $existingEndTime)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 }
 ?>
