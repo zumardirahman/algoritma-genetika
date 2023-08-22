@@ -27,8 +27,8 @@ class GeneticAlgorithm {
         }
     }
 
-    private function generateRandomChromosome() {
-	   $chromosome = [];
+	private function generateRandomChromosome() {
+		$chromosome = [];
 
 		$courses = $this->pdo->query("SELECT * FROM tabel_courses")->fetchAll();
 		$rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
@@ -37,11 +37,22 @@ class GeneticAlgorithm {
 		];  // contoh slot waktu
 
 		foreach ($courses as $course) {
-			$room = $rooms[array_rand($rooms)];
+			// Pilih ruangan yang kapasitasnya cukup untuk jumlah mahasiswa course
+			$suitableRooms = array_filter($rooms, function($room) use ($course) {
+				return $room['capacity'] >= $course['total_students'];
+			});
+
+			if (empty($suitableRooms)) {
+				// Handle situasi dimana tidak ada ruangan yang cukup
+				// Anda bisa menggantinya dengan logika lain sesuai kebutuhan
+				continue;
+			}
+
+			$room = $suitableRooms[array_rand($suitableRooms)];
 			$startTime = $timeSlots[array_rand($timeSlots)];
 
 			// Menghitung waktu berakhir berdasarkan SKS
-			$duration = $course['sks'];  // Misalkan 1 SKS = 1 jam
+			$duration = $course['sks'];
 			$endTime = date("H:i", strtotime("+$duration hour", strtotime($startTime)));
 
 			$gene = "{$course['code']}-{$room['name']}-{$startTime}-{$endTime}-{$course['teacher_id']}";
@@ -49,7 +60,7 @@ class GeneticAlgorithm {
 		}
 
 		return $chromosome;
-    }
+	}
 
     public function calculateFitness($schedule) {
         $fitness = 0;
