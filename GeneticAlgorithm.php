@@ -34,22 +34,11 @@ class GeneticAlgorithm {
 		$rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
 		$timeSlots = [
 			"08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"
-		];  // contoh slot waktu
+		];
 
 		foreach ($courses as $course) {
-			// Pilih ruangan yang kapasitasnya cukup untuk jumlah mahasiswa course
-			$suitableRooms = array_filter($rooms, function($room) use ($course) {
-				return $room['capacity'] >= $course['total_students'];
-			});
-
-			if (empty($suitableRooms)) {
-				// Handle situasi dimana tidak ada ruangan yang cukup
-				// Anda bisa menggantinya dengan logika lain sesuai kebutuhan
-				continue;
-			}
-
-			$room = $suitableRooms[array_rand($suitableRooms)];
-			$startTime = $timeSlots[array_rand($timeSlots)];
+			$room = $this->selectRoom($course, $rooms, $chromosome);
+			$startTime = $this->selectTimeSlot($course, $room, $timeSlots, $chromosome);
 
 			// Menghitung waktu berakhir berdasarkan SKS
 			$duration = $course['sks'];
@@ -123,6 +112,87 @@ class GeneticAlgorithm {
 			return $b->fitness - $a->fitness;
 		});
 		return $this->population[0];
+	}
+	
+	
+	//tambahan helper
+	
+	// private function selectRoom($course, $rooms, $chromosome) {
+		// $suitableRooms = array_filter($rooms, function($room) use ($course) {
+			// return $room['capacity'] >= $course['total_students'];
+		// });
+		// shuffle($suitableRooms);
+
+		// foreach ($suitableRooms as $room) {
+			// if (!$this->isRoomConflict($room, $course, $chromosome)) {
+				// return $room;
+			// }
+		// }
+
+		// // Fallback jika tidak ada ruangan yang sesuai (ini harus dihandle lebih lanjut)
+		// return $rooms[0];
+	// }
+
+	private function selectRoom($course, $rooms, $chromosome) {
+		$suitableRooms = array_filter($rooms, function($room) use ($course) {
+			return $room['capacity'] >= $course['total_students'];
+		});
+		shuffle($suitableRooms);
+
+		foreach ($suitableRooms as $room) {
+			if (!$this->isRoomConflict($room, $course, $chromosome)) {
+				return $room;
+			}
+		}
+
+		// Jika sampai ke sini, berarti tidak ada ruangan yang sesuai
+		// Sebagai contoh, kita bisa memilih ruangan pertama yang tersedia sebagai fallback
+		// Tetapi dalam skenario nyata, Anda mungkin ingin menampilkan pesan kesalahan atau mencoba strategi lain
+		return $rooms[0];
+	}
+
+	private function isRoomConflict($room, $course, $chromosome) {
+		foreach ($chromosome as $gene) {
+			$parts = explode("-", $gene);
+			$existingRoom = $parts[1];
+			$existingStartTime = $parts[2];
+			$existingEndTime = $parts[3];
+
+			// Kita hanya perlu memeriksa apakah ruangan sudah dipesan pada waktu yang sama
+			if ($existingRoom == $room['name'] && $existingStartTime == $parts[2] && $existingEndTime == $parts[3]) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private function selectTimeSlot($course, $room, $timeSlots, $chromosome) {
+		shuffle($timeSlots);
+
+		foreach ($timeSlots as $time) {
+			if (!$this->isTimeConflict($time, $course, $room, $chromosome)) {
+				return $time;
+			}
+		}
+
+		// Fallback jika tidak ada waktu yang sesuai (ini harus dihandle lebih lanjut)
+		return $timeSlots[0];
+	}	
+
+	private function isTimeConflict($time, $course, $room, $chromosome) {
+		$proposedEndTime = date("H:i", strtotime("+$course[sks] hour", strtotime($time)));
+
+		foreach ($chromosome as $gene) {
+			$parts = explode("-", $gene);
+			$existingRoom = $parts[1];
+			$existingStartTime = $parts[2];
+			$existingEndTime = $parts[3];
+
+			if ($existingRoom == $room['name'] && $time >= $existingStartTime && $proposedEndTime <= $existingEndTime) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 }
