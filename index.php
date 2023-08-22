@@ -2,6 +2,7 @@
 require_once 'Schedule.php';
 require_once 'GeneticAlgorithm.php';
 require_once 'db/connect.php';
+require_once 'helper.php'; // Menambahkan file helper
 
 // Parameter algoritma genetika
 $populationSize = 100;
@@ -11,9 +12,6 @@ $maxGenerations = 100;
 
 $ga = new GeneticAlgorithm($pdo, $populationSize, $mutationRate, $crossoverRate, $maxGenerations);
 $ga->run();
-
-// Tampilkan hasil (Ini hanya contoh sederhana, Anda dapat memodifikasi sesuai kebutuhan)
-$bestSchedule = $ga->getBestSchedule();
 
 // Tampilkan hasil
 echo "<h2>Jadwal Terbaik:</h2>";
@@ -28,51 +26,44 @@ echo "<th>Hari</th>";
 echo "<th>Waktu</th>";
 echo "<th>Dosen Pengajar</th>";
 echo "<th>Total Mahasiswa</th>";
+echo "<th>Pertemuan per Minggu</th>";
 echo "</tr>";
 echo "</thead>";
 echo "<tbody>";
 
 $bestSchedule = $ga->getBestSchedule();
+
+$coursesArray = fetchAllCourses($pdo);
+$teachersArray = fetchAllTeachers($pdo);
+$roomsArray = fetchAllRooms($pdo);
+
 foreach ($bestSchedule->chromosome as $class) {
-		$parts = explode("-", $class);
+    $parts = explode("-", $class);
 
-		$courseCode = $parts[0];
-		$room = $parts[1];
-		$startTime = $parts[2];
-		$endTime = $parts[3];
-		$teacherId = $parts[4];
+    $courseCode = $parts[0];
+    $roomName = $parts[1];
+    $day = $parts[2];
+    $startTime = $parts[3];
+    $endTime = $parts[4];
+    $teacherId = $parts[5];
 
-    // Mengambil nama mata kuliah, hari, dan nama dosen dari database
-    //$courseDetails = $pdo->query("SELECT name, day FROM tabel_courses WHERE code = '$courseCode'")->fetch();
-    //$teacherName = $pdo->query("SELECT name FROM tabel_teachers WHERE id = $teacherId")->fetchColumn();
-
-	$courseDetails = $pdo->query("SELECT 	tabel_courses.name, 
-											tabel_courses.day, 
-											tabel_courses.sks, 
-											tabel_courses.total_students, 
-											tabel_rooms.capacity 
-                              FROM tabel_courses 
-                              JOIN tabel_rooms ON tabel_rooms.name = '$room' 
-                              WHERE tabel_courses.code = '$courseCode'")->fetch();
-
-	$stmt = $pdo->prepare("SELECT name FROM tabel_teachers WHERE id = :teacherId");
-	$stmt->bindParam(':teacherId', $teacherId);
-	$stmt->execute();
-	$teacherName = $stmt->fetchColumn();
-
+    $course = $coursesArray[$courseCode];
+    $teacher = $teachersArray[$teacherId];
+    $room = $roomsArray[$roomName];
 
     echo "<tr>";
-    echo "<td>{$courseCode}</td>";
-    echo "<td>{$courseDetails['name']}</td>";
-    echo "<td>{$room} (Capacity: {$courseDetails['capacity']} )</td>";
-    echo "<td>{$courseDetails['sks']}</td>";
-    echo "<td>{$courseDetails['day']}</td>";
+    echo "<td>{$course['code']}</td>";
+    echo "<td>{$course['name']}</td>";
+    echo "<td>{$room['name']} (Capacity: {$room['capacity']} )</td>";
+    echo "<td>{$course['sks']}</td>";
+    echo "<td>{$day}</td>";
     echo "<td>{$startTime} - {$endTime}</td>";
-    echo "<td>{$teacherName}</td>";
-    echo "<td>{$courseDetails['total_students']}</td>";
+    echo "<td>{$teacher['name']}</td>";
+    echo "<td>{$course['total_students']}</td>";
+    echo "<td>{$course['meetings_per_week']}</td>";
     echo "</tr>";
 }
 
 echo "</tbody>";
 echo "</table>";
-
+?>

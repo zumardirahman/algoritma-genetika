@@ -29,23 +29,22 @@ class GeneticAlgorithm {
 
 	private function generateRandomChromosome() {
 		$chromosome = [];
-
+		$days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 		$courses = $this->pdo->query("SELECT * FROM tabel_courses")->fetchAll();
 		$rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
-		$timeSlots = [
-			"08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"
-		];
+		$timeSlots = ["08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"];
 
 		foreach ($courses as $course) {
-			$room = $this->selectRoom($course, $rooms, $chromosome);
-			$startTime = $this->selectTimeSlot($course, $room, $timeSlots, $chromosome);
-
-			// Menghitung waktu berakhir berdasarkan SKS
-			$duration = $course['sks'];
-			$endTime = date("H:i", strtotime("+$duration hour", strtotime($startTime)));
-
-			$gene = "{$course['code']}-{$room['name']}-{$startTime}-{$endTime}-{$course['teacher_id']}";
-			$chromosome[] = $gene;
+			$meetingCounts = $course['meetings_per_week'];  // Menggunakan data dari database
+			for ($i = 0; $i < $meetingCounts; $i++) {
+				$day = $days[array_rand($days)];
+				$room = $this->selectRoom($course, $rooms, $chromosome);
+				$startTime = $this->selectTimeSlot($course, $room, $timeSlots, $chromosome);
+				$duration = $course['sks'];
+				$endTime = date("H:i", strtotime("+$duration hour", strtotime($startTime)));
+				$gene = "{$course['code']}-{$room['name']}-{$day}-{$startTime}-{$endTime}-{$course['teacher_id']}";
+				$chromosome[] = $gene;
+			}
 		}
 
 		return $chromosome;
