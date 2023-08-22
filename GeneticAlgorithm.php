@@ -27,14 +27,50 @@ class GeneticAlgorithm {
         }
     }
 
-    public function calculateFitness($schedule) {
-        $fitness = 0;
+public function calculateFitness($schedule) {
+    $fitness = 0;
 
-        // Logic untuk mengevaluasi fitness
-        // Misalnya, jika tidak ada bentrokan waktu, tambah nilai fitness
+    foreach ($schedule->chromosome as $gene) {
+        $parts = explode("-", $gene);
+        $courseCode = $parts[0];
+        $roomName = $parts[1];
+        $day = $parts[2];
+        $startTime = $parts[3];
+        $endTime = $parts[4];
+        $teacherId = $parts[5];
 
-        $schedule->fitness = $fitness;
+        // Cek konflik ruangan
+        if (!$this->isRoomConflict($room, $course, $schedule->chromosome, $startTime, $endTime, $day)) {
+            $fitness++;
+        }
+
+        // Cek konflik waktu dosen
+        if (!$this->isTeacherTimeConflict($teacherId, $schedule->chromosome, $startTime, $endTime, $day)) {
+            $fitness++;
+        }
     }
+
+    $schedule->fitness = $fitness;
+}
+
+private function isTeacherTimeConflict($teacherId, $chromosome, $proposedStartTime, $proposedEndTime, $day) {
+    foreach ($chromosome as $gene) {
+        $parts = explode("-", $gene);
+        $existingTeacherId = $parts[5];
+        $existingDay = $parts[2];
+        $existingStartTime = $parts[3];
+        $existingEndTime = $parts[4];
+
+        if ($existingTeacherId == $teacherId && $existingDay == $day && 
+            (($existingStartTime >= $proposedStartTime && $existingStartTime < $proposedEndTime) ||
+            ($existingEndTime > $proposedStartTime && $existingEndTime <= $proposedEndTime) ||
+            ($proposedStartTime >= $existingStartTime && $proposedStartTime < $existingEndTime) ||
+            ($proposedEndTime > $existingStartTime && $proposedEndTime <= $existingEndTime))) {
+            return true;
+        }
+    }
+    return false;
+}
 
     public function selection() {
         $totalFitness = array_sum(array_column($this->population, 'fitness'));
@@ -50,28 +86,29 @@ class GeneticAlgorithm {
         return $this->population[0];
     }
 
-    public function crossover($parent1, $parent2) {
-        $childChromosome = [];
-        $crossoverPoint = rand(1, count($parent1->chromosome) - 2);
 
-        for ($i = 0; $i < count($parent1->chromosome); $i++) {
-            if ($i < $crossoverPoint) {
-                $childChromosome[] = $parent1->chromosome[$i];
-            } else {
-                $childChromosome[] = $parent2->chromosome[$i];
-            }
-        }
+public function crossover(array $parent1, array $parent2) {
+    $crossoverPoint = mt_rand(1, count($parent1) - 1);
 
-        return new Schedule($childChromosome);
-    }
+    $child1 = array_merge(array_slice($parent1, 0, $crossoverPoint), array_slice($parent2, $crossoverPoint));
+    $child2 = array_merge(array_slice($parent2, 0, $crossoverPoint), array_slice($parent1, $crossoverPoint));
 
-    public function mutate($schedule) {
-        for ($i = 0; $i < count($schedule->chromosome); $i++) {
-            if (rand(0, 1) < $this->mutationRate) {
-                $schedule->chromosome[$i] = $this->generateRandomGene();
-            }
-        }
-    }
+    // Pastikan anak-anak adalah kromosom valid
+    $child1 = $this->validateChromosome($child1);
+    $child2 = $this->validateChromosome($child2);
+
+    return [$child1, $child2];
+}
+
+public function mutate($chromosome) {
+    $randomGene = $this->generateRandomGene();
+    $randomIndex = mt_rand(0, count($chromosome) - 1);
+
+    $chromosome[$randomIndex] = $randomGene;
+
+    // Pastikan kromosom adalah valid setelah mutasi
+    return $this->validateChromosome($chromosome);
+}
 
     private function generateRandomGene() {
         // Logic serupa dengan generateRandomChromosome, tapi hanya menghasilkan satu gen
@@ -82,6 +119,48 @@ class GeneticAlgorithm {
             // Implementasi dari algoritma genetika
         }
     }
+	
+public function runGA() {
+    $population = [];
+    for ($i = 0; $i < $this->populationSize; $i++) {
+        $population[] = $this->generateRandomChromosome();
+    }
+    
+    for ($generation = 0; $generation < $this->maxGenerations; $generation++) {
+        $newPopulation = [];
+
+        while (count($newPopulation) < $this->populationSize) {
+            $parent1 = $this->rouletteWheelSelection($population);
+            $parent2 = $this->rouletteWheelSelection($population);
+
+            if (mt_rand(0, 1) < $this->crossoverRate) {
+                list($child1, $child2) = $this->crossover($parent1, $parent2);
+
+                if (mt_rand(0, 1) < $this->mutationRate) {
+                    $child1 = $this->mutate($child1);
+                }
+                if (mt_rand(0, 1) < $this->mutationRate) {
+                    $child2 = $this->mutate($child2);
+                }
+
+                $newPopulation[] = $child1;
+                $newPopulation[] = $child2;
+            } else {
+                $newPopulation[] = $parent1;
+                $newPopulation[] = $parent2;
+            }
+        }
+
+        $population = $newPopulation;
+    }
+
+    // Setelah semua generasi selesai, kita mengembalikan kromosom dengan fitness tertinggi
+    usort($population, function($a, $b) {
+        return $b['fitness'] - $a['fitness'];
+    });
+
+    return $population[0];
+}
 
 	public function getBestSchedule() {
 		usort($this->population, function($a, $b) {
@@ -89,6 +168,19 @@ class GeneticAlgorithm {
 		});
 		return $this->population[0];
 	}
+
+private function sortCoursesByCapacity() {
+    // Mengambil data kursus dari database
+    $query = $this->pdo->prepare("SELECT * FROM tabel_courses");
+    $query->execute();
+    $this->courses = $query->fetchAll(PDO::FETCH_ASSOC);
+
+    // Mengurutkan $this->courses berdasarkan 'total_students'
+    usort($this->courses, function($a, $b) {
+        return $b['total_students'] - $a['total_students'];
+    });
+}
+
 	
 	
 private function generateTimeSlots($sksDuration = 50, $interval = 10, $breaks = []) {
@@ -136,57 +228,92 @@ private function generateTimeSlots($sksDuration = 50, $interval = 10, $breaks = 
 
 
 	
-private function generateRandomChromosome() {
+public function generateRandomChromosome() {
     $chromosome = [];
-    $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    $courses = $this->pdo->query("SELECT * FROM tabel_courses")->fetchAll();
-    $rooms = $this->pdo->query("SELECT * FROM tabel_rooms")->fetchAll();
-	
-    $maxAttempts = 10; // Menentukan jumlah maksimal percobaan sebelum menyerah
+    
+    // Urutkan kursus berdasarkan kapasitas dari yang terbesar ke yang terkecil
+    $this->sortCoursesByCapacity(); // Pemanggilan tanpa argumen
 
-    foreach ($courses as $course) {
-        $meetingCounts = $course['meetings_per_week'];
-        $allocatedDays = []; // Menyimpan hari-hari di mana mata kuliah sudah dijadwalkan
-        for ($i = 0; $i < $meetingCounts; $i++) {
-            $success = false;
-            $attempt = 0;
-
-            while (!$success && $attempt < $maxAttempts) {
-                $day = $days[array_rand($days)];
-				
-		$durationMinutes = $course['sks'] * 50;
-        $timeSlots = $this->generateTimeSlots($durationMinutes);
-		
-                // Pastikan mata kuliah tidak dijadwalkan pada hari yang sama dalam seminggu
-                while (in_array($day, $allocatedDays)) {
-                    $day = $days[array_rand($days)];
-                }
-
-                $room = $this->selectRoom($course, $rooms, $chromosome, $day);
-                $startTime = $this->selectTimeSlot($course, $room, $timeSlots, $chromosome, $day);
-                $duration = $course['sks'] * 50; // Menghitung durasi dalam menit
-				$endTime = date("H:i", strtotime("+$duration minute", strtotime($startTime))); // Menambahkan durasi ke startTime
-                
-                if (!$this->isRoomConflict($room, $course, $chromosome, $startTime, $endTime, $day)) {
-                    $gene = "{$course['code']}-{$room['name']}-{$day}-{$startTime}-{$endTime}-{$course['teacher_id']}";
-                    $chromosome[] = $gene;
-                    $allocatedDays[] = $day;
-                    $success = true;
-                }
-
-                $attempt++;
-            }
-
-            if ($attempt == $maxAttempts) {
-					$zonk = "<small style='color:red'><i>Kosong</i></small>";
-                   $gene_err = "{$course['code']}-{$room['name']}-{$zonk}-{$zonk}-{$zonk}-{$course['teacher_id']}";
-                $chromosome[] = $gene_err;
-            }
+    foreach ($this->courses as $course) { // Gunakan $this->courses di sini
+        $room = $this->selectRoomForCourse($course, $chromosome);
+        $day = $this->selectDay($course, $chromosome);
+        $timeslot = $this->selectTimeSlot($course, $chromosome);
+        $teacherId = $this->selectTeacher($course, $chromosome);
+        
+        if ($room && $day && $timeslot && $teacherId) {
+            $gene = $course['code'] . "-" . $room['name'] . "-" . $day . "-" . $timeslot['start'] . "-" . $timeslot['end'] . "-" . $teacherId;
+            array_push($chromosome, $gene);
         }
     }
-
     return $chromosome;
 }
+
+private function selectDay() {
+    $days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    return $days[array_rand($days)];
+}
+
+private function selectTimeSlot($course) {
+    // Misalkan setiap SKS berdurasi 1 jam dan waktu kelas dimulai dari 8 pagi sampai 5 sore.
+    $startHour = 8;
+    $endHour = 17; // 5 sore
+    $courseDuration = $course['sks'];
+
+    $latestStartHour = $endHour - $courseDuration;
+    $selectedStartHour = rand($startHour, $latestStartHour);
+
+    $selectedEndHour = $selectedStartHour + $courseDuration;
+
+    return [
+        "start" => $selectedStartHour . ":00",
+        "end" => $selectedEndHour . ":00"
+    ];
+}
+
+private function selectTeacher($course) {
+    // Misalkan setiap mata kuliah hanya memiliki satu dosen pengajar
+    return $course['teacher_id'];
+}
+
+
+private function selectRoomForCourse($course, $chromosome) {
+    // Untuk saat ini, kita hanya akan memilih ruangan pertama dari database sebagai contoh
+    // Anda dapat memodifikasi ini untuk memilih ruangan berdasarkan kapasitas, ketersediaan, dll.
+
+    $stmt = $this->pdo->prepare("SELECT * FROM tabel_rooms LIMIT 1");
+    $stmt->execute();
+    $room = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $room;
+}
+
+
+public function rouletteWheelSelection($population) {
+    $totalFitness = array_sum(array_column($population, 'fitness'));
+    $randomValue = mt_rand(0, $totalFitness);
+    $cumulative = 0;
+
+	foreach ($population as $chromosome) {
+		if(isset($chromosome['fitness'])) {
+			$cumulative += $chromosome['fitness'];
+			if ($randomValue <= $cumulative) {
+				return $chromosome;
+			}
+		}
+	}
+
+}
+
+
+public function validateChromosome($chromosome) {
+    // Pemeriksaan untuk konflik dan perbaikan
+    // Anda bisa memasukkan logika validasi seperti yang sudah Anda buat di `generateRandomChromosome`
+    // untuk memastikan kromosom tetap memenuhi aturan yang Anda tetapkan.
+    return $chromosome;
+}
+
+
+
 
 private function selectRoom($course, $rooms, $chromosome, $day) {
     $suitableRooms = array_filter($rooms, function($room) use ($course) {
@@ -229,7 +356,7 @@ private function isRoomConflict($room, $course, $chromosome, $proposedStartTime,
     return false;
 }
 
-private function selectTimeSlot($course, $room, $timeSlots, $chromosome, $day) {
+private function selectTimeSlotX($course, $room, $timeSlots, $chromosome, $day) {
     shuffle($timeSlots);
 
     foreach ($timeSlots as $time) {

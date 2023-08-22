@@ -32,7 +32,7 @@
     $maxGenerations = 100;
 
     $ga = new GeneticAlgorithm($pdo, $populationSize, $mutationRate, $crossoverRate, $maxGenerations);
-    $ga->run();
+    $ga->runGA();
 
     // Mendapatkan hasil terbaik dari algoritma genetika
     $bestSchedule = $ga->getBestSchedule();
