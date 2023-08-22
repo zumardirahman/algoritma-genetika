@@ -117,8 +117,8 @@ private function generateRandomChromosome() {
 
                 $room = $this->selectRoom($course, $rooms, $chromosome, $day);
                 $startTime = $this->selectTimeSlot($course, $room, $timeSlots, $chromosome, $day);
-                $duration = $course['sks'];
-                $endTime = date("H:i", strtotime("+$duration hour", strtotime($startTime)));
+                $duration = $course['sks'] * 50; // Menghitung durasi dalam menit
+				$endTime = date("H:i", strtotime("+$duration minute", strtotime($startTime))); // Menambahkan durasi ke startTime
                 
                 if (!$this->isRoomConflict($room, $course, $chromosome, $startTime, $endTime, $day)) {
                     $gene = "{$course['code']}-{$room['name']}-{$day}-{$startTime}-{$endTime}-{$course['teacher_id']}";
@@ -183,7 +183,7 @@ private function selectTimeSlot($course, $room, $timeSlots, $chromosome, $day) {
     shuffle($timeSlots);
 
     foreach ($timeSlots as $time) {
-        $proposedEndTime = date("H:i", strtotime("+$course[sks] hour", strtotime($time)));
+        $proposedEndTime = date("H:i", strtotime("+$course[sks] * 50 minute", strtotime($time))); // Menambahkan durasi ke waktu slot
 
         if (!$this->isTimeConflict($time, $course, $room, $chromosome, $day, $proposedEndTime)) {
             return $time;
@@ -198,12 +198,21 @@ private function isTimeConflict($time, $course, $room, $chromosome, $day, $propo
         $existingRoom = $parts[1];
         $existingDay = $parts[2];
         $existingStartTime = $parts[3];
-        $existingEndTime = $parts[4];
-
-        if ($existingRoom == $room['name'] && $existingDay == $day && 
-            ($time >= $existingStartTime && $proposedEndTime <= $existingEndTime)) {
-            return true;
-        }
+		$existingEndTime = $parts[4];
+		
+		if (is_numeric($proposedEndTime)) {
+			$proposedStartTime = $proposedEndTime - ($course['sks'] * 50);
+		
+			if ($existingRoom == $room['name'] &&
+				(($existingStartTime >= $proposedStartTime && $existingStartTime < $proposedEndTime) ||
+				($existingEndTime > $proposedStartTime && $existingEndTime <= $proposedEndTime) ||
+				($proposedStartTime >= $existingStartTime && $proposedStartTime < $existingEndTime) ||
+				($proposedEndTime > $existingStartTime && $proposedEndTime <= $existingEndTime))) {
+				return true;
+			} else {
+				return false;
+			}
+		}
     }
     return false;
 }

@@ -36,7 +36,7 @@
 
     // Mendapatkan hasil terbaik dari algoritma genetika
     $bestSchedule = $ga->getBestSchedule();
-
+var_dump($bestSchedule);
     // Mengekstrak data mata kuliah, dosen, dan ruangan dari database
     $coursesArray = fetchAllCourses($pdo);
     $teachersArray = fetchAllTeachers($pdo);
