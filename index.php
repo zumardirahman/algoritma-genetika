@@ -27,6 +27,7 @@ echo "<th>SKS</th>";
 echo "<th>Hari</th>";
 echo "<th>Waktu</th>";
 echo "<th>Dosen Pengajar</th>";
+echo "<th>Total Mahasiswa</th>";
 echo "</tr>";
 echo "</thead>";
 echo "<tbody>";
@@ -45,10 +46,14 @@ foreach ($bestSchedule->chromosome as $class) {
     //$courseDetails = $pdo->query("SELECT name, day FROM tabel_courses WHERE code = '$courseCode'")->fetch();
     //$teacherName = $pdo->query("SELECT name FROM tabel_teachers WHERE id = $teacherId")->fetchColumn();
 
-	$stmt = $pdo->prepare("SELECT name, day, sks FROM tabel_courses WHERE code = :courseCode");
-	$stmt->bindParam(':courseCode', $courseCode);
-	$stmt->execute();
-	$courseDetails = $stmt->fetch();
+	$courseDetails = $pdo->query("SELECT 	tabel_courses.name, 
+											tabel_courses.day, 
+											tabel_courses.sks, 
+											tabel_courses.total_students, 
+											tabel_rooms.capacity 
+                              FROM tabel_courses 
+                              JOIN tabel_rooms ON tabel_rooms.name = '$room' 
+                              WHERE tabel_courses.code = '$courseCode'")->fetch();
 
 	$stmt = $pdo->prepare("SELECT name FROM tabel_teachers WHERE id = :teacherId");
 	$stmt->bindParam(':teacherId', $teacherId);
@@ -59,11 +64,12 @@ foreach ($bestSchedule->chromosome as $class) {
     echo "<tr>";
     echo "<td>{$courseCode}</td>";
     echo "<td>{$courseDetails['name']}</td>";
-    echo "<td>{$room}</td>";
+    echo "<td>{$room} (Capacity: {$courseDetails['capacity']} )</td>";
     echo "<td>{$courseDetails['sks']}</td>";
     echo "<td>{$courseDetails['day']}</td>";
     echo "<td>{$startTime} - {$endTime}</td>";
     echo "<td>{$teacherName}</td>";
+    echo "<td>{$courseDetails['total_students']}</td>";
     echo "</tr>";
 }
 
